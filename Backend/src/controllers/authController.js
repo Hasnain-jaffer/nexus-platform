@@ -2,6 +2,7 @@ const crypto          = require('crypto');
 const { body }        = require('express-validator');
 const User            = require('../models/User');
 const sendTokenResponse = require('../utils/jwt');
+const sendEmail = require('../utils/sendEmail');
 
 // ── Validation rule arrays (reusable in routes) ────────────────────────────
 exports.registerRules = [
@@ -63,6 +64,7 @@ exports.getMe = async (req, res) => {
 };
 
 // ── POST /api/auth/forgot-password ────────────────────────────────────────
+// ── POST /api/auth/forgot-password ────────────────────────────────────────
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
   const user = await User.findOne({ email });
@@ -81,13 +83,32 @@ exports.forgotPassword = async (req, res) => {
   user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
   await user.save({ validateBeforeSave: false });
 
-  // In production, send an email here.
-  // For now we return the raw token so the frontend can test the reset flow.
   const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset your Business Nexus password',
+      html: `
+        <p>Hi ${user.name},</p>
+        <p>You requested a password reset. Click the link below — it expires in 10 minutes:</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>If you didn't request this, you can safely ignore this email.</p>
+      `,
+    });
+  } catch (err) {
+    // Email failed to send — roll back the token so the user can try again cleanly
+    user.resetPasswordToken  = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+    console.error('Failed to send reset email:', err.message);
+    return res.status(500).json({ success: false, message: 'Could not send reset email. Please try again later.' });
+  }
 
   res.status(200).json({
     success: true,
-    message: 'Reset token generated (check resetUrl in development)',
+    message: 'If an account with that email exists, reset instructions have been sent',
+    // Still expose the raw link in development so you can test without a working inbox
     ...(process.env.NODE_ENV === 'development' && { resetUrl }),
   });
 };
