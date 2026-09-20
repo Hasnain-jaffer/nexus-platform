@@ -15,8 +15,8 @@ const { Server }  = require('socket.io');
 const cors        = require('cors');
 const helmet      = require('helmet');
 const morgan      = require('morgan');
-const rateLimit   = require('express-rate-limit');
 const path        = require('path');
+const { apiLimiter } = require('./middleware/rateLimiters');
 
 const connectDB      = require('./config/db');
 const errorHandler   = require('./middleware/errorHandler');
@@ -73,17 +73,7 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', creden
 
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 100,
-  message: { success: false, message: 'Too many requests, please try again later' },
-});
-app.use('/api', limiter);
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 20,
-  message: { success: false, message: 'Too many authentication attempts' },
-});
-app.use('/api/auth', authLimiter);
+app.use('/api', apiLimiter);
 
 // ── Body parsers ──────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
