@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User, Lock, Bell, Globe, Palette, CreditCard } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -7,11 +7,47 @@ import { Badge } from '../../components/ui/Badge';
 import { Avatar } from '../../components/ui/Avatar';
 import { useAuth } from '../../context/AuthContext';
 
+// Fields the backend actually persists via PUT /api/users/:id
+// (see userController.js's `allowed` whitelist — role/email are deliberately excluded there)
+interface ProfileFormState {
+  name: string;
+  location: string;
+  bio: string;
+}
+
+const toFormState = (u: { name: string; location?: string; bio?: string }): ProfileFormState => ({
+  name: u.name,
+  location: u.location ?? '',
+  bio: u.bio ?? '',
+});
+
 export const SettingsPage: React.FC = () => {
-  const { user } = useAuth();
-  
+  const { user, updateProfile } = useAuth();
+
+  const [form, setForm] = useState<ProfileFormState>(() => (user ? toFormState(user) : { name: '', location: '', bio: '' }));
+  const [isSaving, setIsSaving] = useState(false);
+
   if (!user) return null;
-  
+
+  const handleChange = (field: keyof ProfileFormState) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const handleCancel = () => setForm(toFormState(user));
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await updateProfile(user.id, form);
+    } catch {
+      // Errors are already surfaced via toast inside AuthContext.updateProfile
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -85,13 +121,15 @@ export const SettingsPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Full Name"
-                  defaultValue={user.name}
+                  value={form.name}
+                  onChange={handleChange('name')}
                 />
                 
                 <Input
                   label="Email"
                   type="email"
-                  defaultValue={user.email}
+                  value={user.email}
+                  disabled
                 />
                 
                 <Input
@@ -102,7 +140,8 @@ export const SettingsPage: React.FC = () => {
                 
                 <Input
                   label="Location"
-                  defaultValue="San Francisco, CA"
+                  value={form.location}
+                  onChange={handleChange('location')}
                 />
               </div>
               
@@ -113,13 +152,14 @@ export const SettingsPage: React.FC = () => {
                 <textarea
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                   rows={4}
-                  defaultValue={user.bio}
+                  value={form.bio}
+                  onChange={handleChange('bio')}
                 ></textarea>
               </div>
               
               <div className="flex justify-end gap-3">
-                <Button variant="outline">Cancel</Button>
-                <Button>Save Changes</Button>
+                <Button variant="outline" onClick={handleCancel} disabled={isSaving}>Cancel</Button>
+                <Button onClick={handleSave} isLoading={isSaving}>Save Changes</Button>
               </div>
             </CardBody>
           </Card>

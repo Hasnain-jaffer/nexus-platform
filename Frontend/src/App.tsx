@@ -2,10 +2,13 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Layouts
 import { DashboardLayout } from './components/layout/DashboardLayout';
+import { AuthGuard } from './components/layout/AuthGuard';
 
 // Auth Pages
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 
 // Dashboard Pages
 import { EntrepreneurDashboard } from './pages/dashboard/EntrepreneurDashboard';
@@ -31,9 +34,16 @@ import { ChatPage } from './pages/chat/ChatPage';
 function App() {
   return (
     <Routes>
-      {/* Authentication Routes */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      {/* Authentication Routes — AuthGuard redirects already-logged-in users to their dashboard */}
+      <Route element={<AuthGuard redirectIfAuthenticated />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      </Route>
+
+      {/* Reset Password is reachable from an emailed/shown link even while "logged in"
+          isn't a meaningful state yet, so it's intentionally outside AuthGuard */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Dashboard Routes */}
       <Route path="/dashboard" element={<DashboardLayout />}>
